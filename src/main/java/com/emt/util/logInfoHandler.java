@@ -7,7 +7,12 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.springframework.asm.Handle;
 
 import com.emt.vo.Alarm;
 import com.emt.vo.LogHandle;
@@ -18,51 +23,121 @@ public class logInfoHandler {
 	
 	private SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
 	
-    public LogHandle getStartTime(String msg) {
+    public LogHandle getStartMsg(String msg) {
     	LogHandle handle = new LogHandle();
-    	long time = simpleDateFormat.parse(msg.substring(0,23)).getTime();
-    	handle.setLhStart(time);
-    	String log = msg.split("OperationLog:")[1];
-    	handle.setId(log.split("\\|")[0]);
+    	//根据START将日志默认输出和打印日志分开
+		String[] logs = msg.split("START");
+		//处理前默认输出日志，截取时间，项目名，线程ID，方法名信息
+		String[] topHalfLog = logs[0].split("\\[");
+		String time = topHalfLog[0].substring(0, 23);
+		String projectName = topHalfLog[1].replace("] ","");
+		String threadName = topHalfLog[2].substring(0,32);
+		String className = topHalfLog[2].substring(34,topHalfLog[2].length()).replace(" ","").replace(":","");
+		//处理后半段信息，截取方法名
+		String methodName = logs[1].split("\\|")[1];
+    	try {
+			handle.setLhStart(simpleDateFormat.parse(time).getTime());
+		} catch (ParseException e) {
+			handle.setLhStart(0);
+		}
+    	handle.setLhProject(projectName);
+    	handle.setLhId(threadName);
+    	handle.setLhClass(className);
+    	handle.setLhMethod(methodName);
+    	handle.setLhSuccess("0");
 		return handle;
 	}
     
-    public LogHandle getEndTime(String msg) {
+    public LogHandle getEndMsg(String msg) {
     	LogHandle handle = new LogHandle();
-    	handle.setEndTime(msg.substring(0,23));
+		//处理前默认输出日志，截取时间，线程ID
+		String[] topHalfLog = msg.split("\\[");
+		String time = topHalfLog[0].substring(0, 23);
+		String threadName = topHalfLog[2].substring(0,32);
+		handle.setLhId(threadName);
+		try {
+			handle.setLhEnd(simpleDateFormat.parse(time).getTime());
+		} catch (ParseException e) {
+			handle.setLhEnd(0);
+		}
 		return handle;
 	}
     
-    public Alarm getAlarmInfo(String msg) {
-    	Alarm alarm = new Alarm();
-    	String str[] = msg.split("OperationLog:");
-    	alarm.setAlarmId(str[1].split("\\|")[0]);
-    	alarm.setAlarmName("业务异常");					//告警名称
-    	alarm.setAlarmStatus("0");						//告警处理状态，0：未处理
-    	alarm.setAlarmTime(str[0].substring(0,23));		//告警触发时间
-    	alarm.setAlarmEve("内网");							//告警环境
-    	String pro = (str[0].split("]")[1]).replace(" ", ""); 
-    	alarm.setAlarmNum("1");
-    	alarm.setAlarmProject(pro.split("\\.")[2]);		//项目名称
-    	alarm.setAlarmType(str[0].contains("ERROR")?"ERROR":str[0].contains("WARN")?"WARN":"");//告警类型
-    	alarm.setAlarmLevel(alarm.getAlarmType().equals("WARN")?"1":"2");//告警等级
-    	alarm.setAlarmMsg(str[1].split("\\|")[2]);
-		return alarm;
-    	
-	}
+    public LogHandle getErrorMsg(String msg){
+    	LogHandle handle = new LogHandle();
+    	String[] logs = msg.split("OperationLog");
+		//处理前默认输出日志，截取时间，线程ID
+		String[] topHalfLog = logs[0].split("\\[");
+		String time = topHalfLog[0].substring(0, 23);
+		try {
+			handle.setLhErrorTime(simpleDateFormat.parse(time).getTime());
+		} catch (ParseException e) {
+			handle.setLhErrorTime(0);
+		}
+		String threadName = topHalfLog[2].substring(0,32);
+		//处理后半段信息，截取错误码，错误信息，请求数据
+		String[] bottomHalfLog = logs[1].split("\\|");
+		handle.setLhId(threadName);
+		handle.setLhErrorCode(bottomHalfLog[1]);
+		handle.setLhErrorMsg(bottomHalfLog[2]);
+		handle.setLhRequestMsg(bottomHalfLog[3]);
+		return handle;
+    }
     
-    public Alarm getAlarmException(String msg) {
-    	Alarm alarm = new Alarm();
-    	alarm.setAlarmTime(msg.substring(0,23));		//告警触发时间
-    	alarm.setAlarmId("1111");
-    	alarm.setAlarmName("Exception");
-    	alarm.setAlarmMsg(msg);
-    	System.out.println(alarm.getAlarmTime());
-    	System.out.println(alarm.getAlarmId());
-    	System.out.println(alarm.getAlarmName());
-    	System.out.println(alarm.getAlarmMsg());
-		return alarm;
-	}	 
+    public Handle getExceptionMsg(String msg){
+    	LogHandle handle = new LogHandle();
+		String str = "yulv : 123456 # yulv@21cn.com";
+		Matcher matcher = Pattern.compile(":").matcher(str);
+		int index = 0;
+		if (matcher.find()) {
+			index = matcher.start();
+		}
+		// Exception前半段信息，截取时间，线程ID，
+		String topHalfLog = msg.substring(0, index);
+		String[] errorHalfLog = topHalfLog.split("\\[");
+		String time = errorHalfLog[0].substring(0, 23);
+		String threadName = errorHalfLog[2].split("\\]")[0];
+		try {
+			handle.setLhErrorTime(simpleDateFormat.parse(time).getTime());
+		} catch (ParseException e) {
+			handle.setLhErrorTime(0);
+		}
+		handle.setLhId(threadName);
+		String errorMsg = msg.substring(index + 1, msg.length());
+		handle.setLhErrorMsg(errorMsg);
+		return null;
+    }
+    
+//    public Alarm getAlarmInfo(String msg) {
+//    	Alarm alarm = new Alarm();
+//    	String str[] = msg.split("OperationLog:");
+//    	alarm.setAlarmId(str[1].split("\\|")[0]);
+//    	alarm.setAlarmName("业务异常");					//告警名称
+//    	alarm.setAlarmStatus("0");						//告警处理状态，0：未处理
+//    	alarm.setAlarmTime(str[0].substring(0,23));		//告警触发时间
+//    	alarm.setAlarmEve("内网");							//告警环境
+//    	String pro = (str[0].split("]")[1]).replace(" ", ""); 
+//    	alarm.setAlarmNum("1");
+//    	alarm.setAlarmProject(pro.split("\\.")[2]);		//项目名称
+//    	alarm.setAlarmType(str[0].contains("ERROR")?"ERROR":str[0].contains("WARN")?"WARN":"");//告警类型
+//    	alarm.setAlarmLevel(alarm.getAlarmType().equals("WARN")?"1":"2");//告警等级
+//    	alarm.setAlarmMsg(str[1].split("\\|")[2]);
+//		return alarm;
+//    	
+//	}
+//    
+//    public Alarm getAlarmException(String msg) {
+//    	Alarm alarm = new Alarm();
+//    	alarm.setAlarmTime(msg.substring(0,23));		//告警触发时间
+//    	alarm.setAlarmId("1111");
+//    	alarm.setAlarmName("Exception");
+//    	alarm.setAlarmMsg(msg);
+//    	System.out.println(alarm.getAlarmTime());
+//    	System.out.println(alarm.getAlarmId());
+//    	System.out.println(alarm.getAlarmName());
+//    	System.out.println(alarm.getAlarmMsg());
+//		return alarm;
+//	}	 
     
     public void setHttpConn(String url,String sendStr){
     	BufferedReader reader = null;  
