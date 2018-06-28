@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.emt.dao.LogHandleMapper">
+    <resultMap id="BaseResultMap" type="com.emt.vo.LogHandle">
+        <result	property="lhId"			column="LH_ID"			jdbcType="VARCHAR"/>
+        <result property="lhProject"	column="LH_PROJECT"		jdbcType="VARCHAR"/>
+        <result property="lhClass"		column="LH_CLASS"		jdbcType="VARCHAR"/>
+        <result property="lhMethod"		column="LH_METHOD"		jdbcType="VARCHAR"/>
+        <result property="lhSuccess"	column="LH_SUCCESS"		jdbcType="VARCHAR"/>
+        <result property="lhStart"		column="LH_START"		jdbcType="INTEGER"/>
+        <result property="lhEnd"		column="LH_END"			jdbcType="INTEGER"/>
+    </resultMap>
+    
+    <insert id="insertLogHandInfo" parameterType="com.emt.vo.LogHandle">
+    	INSERT INTO M_LOGHANDLE (LH_ID,LH_PROJECT,LH_CLASS,LH_METHOD,LH_SUCCESS,LH_START,LH_END)
+    	VALUES(
+    	#{lhId,jdbcType=VARCHAR},#{lhProject,jdbcType=VARCHAR},#{lhClass,jdbcType=VARCHAR},
+    	#{lhMethod,jdbcType=VARCHAR},#{lhSuccess,jdbcType=VARCHAR},#{lhStart,jdbcType=VARCHAR},
+    	#{lhEnd,jdbcType=VARCHAR})
+    </insert>
+    
+     <update id="updateHappenTimes" parameterType="com.emt.vo.LogHandle">
+    	UPDATE M_LOGHANDLE M 
+    		<trim prefix="SET" suffixOverrides=",">
+				<if test="lhSuccess !=null"> LH_SUCCESS=#{lhSuccess},</if>
+				<if test="lhEnd !=null"> LH_END=#{lhEnd}</if>
+			</trim>
+    		WHERE M.LH_ID=#{lhId}
+    </update>
+    
+</mapper>
