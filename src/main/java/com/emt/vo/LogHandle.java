@@ -15,7 +15,9 @@ public class LogHandle {
 	private long   lhEnd;
 	
 	//业务请求错误标志 0:正常请求 1：业务错误请求（捕获）2:业务错误异常（抛出）3：系统异常（内存溢出）
-	private String lhSuccess;		
+	private String lhSuccess;	
+	
+	private String lhErrorName;
 	
 	private long   lhErrorTime;		//业务错误时间
 	
@@ -26,6 +28,24 @@ public class LogHandle {
 	private String lhRequestMsg;	//业务请求信息
 	
 	private String lhErrorState;	//异常处理标志
+	
+	private int inserErrorMsgFlag;	//插入新的Exception标志
+	
+	public String getLhErrorName() {
+		return lhErrorName;
+	}
+
+	public void setLhErrorName(String lhErrorName) {
+		this.lhErrorName = lhErrorName;
+	}
+
+	public int getInserErrorMsgFlag() {
+		return inserErrorMsgFlag;
+	}
+
+	public void setInserErrorMsgFlag(int inserErrorMsgFlag) {
+		this.inserErrorMsgFlag = inserErrorMsgFlag;
+	}
 
 	public String getLhErrorState() {
 		return lhErrorState;

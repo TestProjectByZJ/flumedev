@@ -10,7 +10,7 @@ public class Test {
 	
 	public static void main(String[] args) throws Exception {
 		/*
-		 * 研究分析Exception 
+		 * 分析Exception 
 		 * 1:业务异常{
 		 * 		1：空thredId，空项目名，有时间
 		 * 		2：有id,有时间
@@ -19,7 +19,7 @@ public class Test {
 		 * 		1：无时间打印，无ID，项目名，信息归类到下一条信息，（启动虚拟机，进行异常模拟）内存栈溢出
 		 * }
 		 */		
-		getIndex();
+		GetErrorMsg();
 	}
 	
 	public static void getIndex(){

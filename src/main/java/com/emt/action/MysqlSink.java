@@ -1,11 +1,13 @@
 package com.emt.action;
 
-import com.emt.service.AlarmService;
 import com.emt.service.LogHandleService;
 import com.emt.util.logInfoHandler;
-import com.emt.vo.Alarm;
 import com.emt.vo.LogHandle;
 import com.google.common.base.Throwables;
+
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+
 import org.apache.flume.*;
 import org.apache.flume.conf.Configurable;
 import org.apache.flume.sink.AbstractSink;
@@ -18,41 +20,47 @@ import org.springframework.context.support.FileSystemXmlApplicationContext;
  
 public class MysqlSink extends AbstractSink implements Configurable {
  
-    private Logger LOG = LoggerFactory.getLogger(MysqlSink.class);
-    
     @Autowired
 	private LogHandleService logHandleService ;
-	
-	@Autowired
-	private AlarmService alarmService;
-	
-	private ApplicationContext context;
+    
+    private Logger logger = LoggerFactory.getLogger(MysqlSink.class);
+    
+    private ApplicationContext context;
 	
 	private logInfoHandler loginfohandler;
 	
+	private static final int QUEUE_LENGTH = 10000 * 10;
+    
+    private BlockingQueue<String> Queue = new LinkedBlockingQueue<String>(QUEUE_LENGTH);
+    
+    private byte[] lock = new byte[0];
+
+	
     public void configure(Context context) {
     }
- 
-    @Override
+    
+    public MysqlSink() {
+    	queueThread();
+	}
+
+	@Override
     public void start() {
         super.start();
         try {
         	 context =new FileSystemXmlApplicationContext("classpath*:config/applicationContext.xml");
              logHandleService = (LogHandleService) context.getBean("logHandleService");
-             alarmService = (AlarmService) context.getBean("alarmService");
              loginfohandler = new logInfoHandler();
         } catch (Exception e) {
             e.printStackTrace();
             System.exit(1);
         }
- 
     }
  
     @Override
     public void stop() {
         super.stop();
     }
- 
+    
     public Status process() throws EventDeliveryException {
         Status result = Status.READY;
         Channel channel = getChannel();
@@ -68,39 +76,28 @@ public class MysqlSink extends AbstractSink implements Configurable {
                 result = Status.BACKOFF;
             }
             if (info!=null&&info!="") {
-            	if(info.contains("OperationLog:")||info.contains("START")||info.contains("END")){
-                	if(info.contains("START")){
-                		//保存开始时间
-                		LogHandle handle = loginfohandler.getStartTime(info);
-                		logHandleService.inserLogHandleInfo(handle);
-                	}else if(info.contains("END")){
-                		//保存结束时间
-                		LogHandle handle = loginfohandler.getEndTime(info);
-                		logHandleService.updateLogHandleInfo(handle);
-                	}else if(info.contains("ERROR")||info.contains("WARN")){
-                		Alarm alarm =loginfohandler.getAlarmInfo(info);
-                		alarmService.insertAlarmInfo(alarm);
-                		//统计发生次数+更新
-                		int happenTimes = alarmService.getHappenTimes(alarm);
-                		alarm.setAlarmNum(happenTimes+"");
-                		alarmService.updateHappenTimes(alarm);
-                		loginfohandler.setHttpConn("http://192.168.25.1:18100/websocket/pushMsg", "");
-                	}
-                }else if(info.contains("Exception")||info.contains("exception")){
-                	//TODO exception告警监控
-                	Alarm alarm = loginfohandler.getAlarmException(info);
-                	alarmService.insertAlarmInfo(alarm);
-                	loginfohandler.setHttpConn("http://192.168.25.1:18100/websocket/pushMsg", "");
-                }
+            	
+            	 try {
+                     Queue.put(info);
+                 } catch (InterruptedException e) {
+                     e.printStackTrace();
+                     transaction.commit();
+                     logger.error("put quene error:" + e.getMessage());
+                 }
+                 synchronized (lock) {
+                     lock.notifyAll();
+                 }
+
             }
             transaction.commit();
         } catch (Throwable e) {
             try {
                 transaction.rollback();
             } catch (Exception e2) {
-                LOG.error("Exception in rollback. Rollback might not have been" + "successful.", e2);
+            	logger.error("Exception in rollback. Rollback might not have been" + "successful.", e2);
             }
-            LOG.error("Failed to commit transaction." + "Transaction rolled back.", e);
+        	logger.error("Failed to commit transaction." + "Transaction rolled back.", e);
+            transaction.commit();
             Throwables.propagate(e);
         } finally {
             transaction.close();
@@ -108,5 +105,63 @@ public class MysqlSink extends AbstractSink implements Configurable {
  
         return result;
     }
+    
+    public void doInfo(String info){
+    	try {
+        	if(info.contains("OperationLog")||info.contains("START")||info.contains("END")){
+            	if(info.contains("START")){
+            		System.out.println("START-------->"+info);
+            		//保存开始时间
+            		LogHandle handle = loginfohandler.getStartMsg(info);
+            		logHandleService.inserLogHandleInfo(handle);
+            	}else if(info.contains("END")){
+            		System.out.println("END---------->"+info);
+            		//保存结束时间
+            		LogHandle handle = loginfohandler.getEndMsg(info);
+            		logHandleService.updateLogHandleInfo(handle);
+            	}else if(info.contains("OperationLog")){
+            		System.out.println("OperationLog->"+info);	
+            		LogHandle handle = loginfohandler.getErrorMsg(info);
+            		logHandleService.updateLogHandleInfo(handle);
+//            		loginfohandler.setHttpConn("http://192.168.25.1:18100/websocket/pushMsg", "");
+            	}
+            }else if(info.contains("Exception")||info.contains("exception")){
+            	System.out.println("Exception---->"+info);
+            	LogHandle handle = loginfohandler.getExceptionMsg(info);
+            	if(handle.getInserErrorMsgFlag()==1){
+            		logHandleService.inserLogHandleInfo(handle);
+            	}else if(handle.getInserErrorMsgFlag()==0){
+            		logHandleService.updateLogHandleInfo(handle);
+            	}
+//            	loginfohandler.setHttpConn("http://192.168.25.1:18100/websocket/pushMsg", "");
+            }
+		} catch (Exception e) {
+			
+		}
+    }
+    
+    
+    private void queueThread() {
+    	Runnable race1 = new Runnable() {  
+    	    public void run() {  
+    	    	synchronized (lock) {
+                    try {
+                        while (true) {
+                    		if (Queue.isEmpty()) {
+                                //System.out.println("队列消息处理完毕，进入BLOCKING");
+                    			lock.wait();
+                                continue;
+                            }
+                    		doInfo(Queue.poll());
+                        }
+                    } catch (InterruptedException e) {
+                    	logger.error("队列error:" + e.getMessage());
+                    }
+                }
+    	    }  
+    	};
+        new Thread(race1).start();
+    }
+    
     
 }

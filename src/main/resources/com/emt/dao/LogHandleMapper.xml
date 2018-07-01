@@ -9,21 +9,33 @@
         <result property="lhSuccess"	column="LH_SUCCESS"		jdbcType="VARCHAR"/>
         <result property="lhStart"		column="LH_START"		jdbcType="INTEGER"/>
         <result property="lhEnd"		column="LH_END"			jdbcType="INTEGER"/>
+        <result property="lhErrorTime"	column="LH_ERRORTIME"	jdbcType="INTEGER"/>
+        <result property="lhErrorMsg"	column="LH_ERRORMSG"	jdbcType="VARCHAR"/>
+        <result property="lhErrorCode"	column="LH_ERRORCODE"	jdbcType="VARCHAR"/>
+        <result property="lhRequestMsg"	column="LH_REQUESTMAG"	jdbcType="VARCHAR"/>
+        <result property="lhErrorState"	column="LH_ERRORSTATE"	jdbcType="VARCHAR"/>
+        <result property="lhErrorName"	column="LH_ERRORNAME"	jdbcType="VARCHAR"/>
     </resultMap>
-    
+	
     <insert id="insertLogHandInfo" parameterType="com.emt.vo.LogHandle">
-    	INSERT INTO M_LOGHANDLE (LH_ID,LH_PROJECT,LH_CLASS,LH_METHOD,LH_SUCCESS,LH_START,LH_END)
+    	INSERT INTO M_LOGHANDLE (LH_ID,LH_PROJECT,LH_CLASS,LH_METHOD,LH_SUCCESS,LH_START)
     	VALUES(
-    	#{lhId,jdbcType=VARCHAR},#{lhProject,jdbcType=VARCHAR},#{lhClass,jdbcType=VARCHAR},
-    	#{lhMethod,jdbcType=VARCHAR},#{lhSuccess,jdbcType=VARCHAR},#{lhStart,jdbcType=VARCHAR},
-    	#{lhEnd,jdbcType=VARCHAR})
+	    	#{lhId,jdbcType=VARCHAR},#{lhProject,jdbcType=VARCHAR},#{lhClass,jdbcType=VARCHAR},
+	    	#{lhMethod,jdbcType=VARCHAR},#{lhSuccess,jdbcType=VARCHAR},#{lhStart,jdbcType=VARCHAR}
+	    )
     </insert>
     
-     <update id="updateHappenTimes" parameterType="com.emt.vo.LogHandle">
+     <update id="updateLogHandleInfo" parameterType="com.emt.vo.LogHandle">
     	UPDATE M_LOGHANDLE M 
     		<trim prefix="SET" suffixOverrides=",">
-				<if test="lhSuccess !=null"> LH_SUCCESS=#{lhSuccess},</if>
-				<if test="lhEnd !=null"> LH_END=#{lhEnd}</if>
+				<if test="lhEnd != 0"> LH_END=#{lhEnd},</if>
+				<if test="lhErrorTime != 0"> LH_ERRORTIME=#{lhErrorTime},</if>
+				<if test="lhErrorMsg !=null"> LH_ERRORMSG=#{lhErrorMsg},</if>
+				<if test="lhErrorCode !=null"> LH_ERRORCODE=#{lhErrorCode},</if>
+				<if test="lhRequestMsg !=null"> LH_REQUESTMAG=#{lhRequestMsg},</if>
+				<if test="lhErrorState !=null"> LH_ERRORSTATE=#{lhErrorState},</if>
+				<if test="lhErrorName !=null"> LH_ERRORNAME=#{lhErrorName},</if>
+				<if test="lhSuccess !=null"> LH_SUCCESS=#{lhSuccess}</if>
 			</trim>
     		WHERE M.LH_ID=#{lhId}
     </update>

@@ -12,9 +12,6 @@ import java.text.SimpleDateFormat;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.springframework.asm.Handle;
-
-import com.emt.vo.Alarm;
 import com.emt.vo.LogHandle;
 
   
@@ -74,38 +71,66 @@ public class logInfoHandler {
 		} catch (ParseException e) {
 			handle.setLhErrorTime(0);
 		}
-		String threadName = topHalfLog[2].substring(0,32);
+		String threadName = null;
+		String className = null;
+		try {
+			threadName = topHalfLog[2].substring(0,32);
+			className = topHalfLog[2].substring(34,topHalfLog[2].length()).replace(" ","").replace(":","");
+		} catch (Exception e) {
+			className = null;
+		}
 		//处理后半段信息，截取错误码，错误信息，请求数据
 		String[] bottomHalfLog = logs[1].split("\\|");
 		handle.setLhId(threadName);
+		handle.setLhClass(className);
 		handle.setLhErrorCode(bottomHalfLog[1]);
 		handle.setLhErrorMsg(bottomHalfLog[2]);
 		handle.setLhRequestMsg(bottomHalfLog[3]);
+		handle.setLhErrorState("0");
+		handle.setLhSuccess("1");
+		handle.setLhErrorName("业务异常");
 		return handle;
     }
     
-    public Handle getExceptionMsg(String msg){
+    public LogHandle getExceptionMsg(String msg){
     	LogHandle handle = new LogHandle();
-		String str = "yulv : 123456 # yulv@21cn.com";
-		Matcher matcher = Pattern.compile(":").matcher(str);
-		int index = 0;
-		if (matcher.find()) {
-			index = matcher.start();
-		}
-		// Exception前半段信息，截取时间，线程ID，
-		String topHalfLog = msg.substring(0, index);
-		String[] errorHalfLog = topHalfLog.split("\\[");
-		String time = errorHalfLog[0].substring(0, 23);
-		String threadName = errorHalfLog[2].split("\\]")[0];
+    	handle.setInserErrorMsgFlag(0);
 		try {
-			handle.setLhErrorTime(simpleDateFormat.parse(time).getTime());
-		} catch (ParseException e) {
-			handle.setLhErrorTime(0);
+			Matcher matcher = Pattern.compile(":").matcher(msg);
+			int index = 23;
+			while(matcher.find()) {
+				if (matcher.start()>23) {
+					index = matcher.start();
+					break;
+				}
+			}
+			// Exception前半段信息，截取时间，线程ID，
+			String topHalfLog = msg.substring(0, index);
+			String[] errorHalfLog = topHalfLog.split("\\[");
+			String time = errorHalfLog[0].substring(0, 23);
+			String threadName = errorHalfLog[2].split("\\]")[0];
+			try {
+				handle.setLhErrorTime(simpleDateFormat.parse(time).getTime());
+			} catch (ParseException e) {
+				handle.setLhErrorTime(0);
+			}
+			if(threadName.length()<30){
+				threadName = java.util.UUID.randomUUID().toString().replaceAll("-", "").toUpperCase();
+				String className = errorHalfLog[3].replace("]", "").replace(" ", "").replace(":", "");
+				handle.setLhClass(className);
+				handle.setInserErrorMsgFlag(1);
+			}
+			handle.setLhId(threadName);
+			String errorMsg = msg.substring(index + 1, msg.length());
+			handle.setLhErrorMsg(errorMsg);
+		} catch (Exception e) {
+			handle.setInserErrorMsgFlag(2);
+			return handle;
 		}
-		handle.setLhId(threadName);
-		String errorMsg = msg.substring(index + 1, msg.length());
-		handle.setLhErrorMsg(errorMsg);
-		return null;
+		handle.setLhErrorState("0");
+		handle.setLhSuccess("2");
+		handle.setLhErrorName("系统异常");
+		return handle;
     }
     
 //    public Alarm getAlarmInfo(String msg) {
